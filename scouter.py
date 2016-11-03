@@ -10,7 +10,7 @@ from collections import defaultdict
 fireBaseUrl = "https://project-6747688871085580068.firebaseio.com"
 sid = SentimentIntensityAnalyzer()
 punctuation = ["?","!",",",".",";"]
-questionKeywords = ["who", "what", "when", "why", "where"]
+questionKeywords = ["who", "what", "when", "why", "where", "whose", "whom", "which", "how"]
 
 
 
@@ -27,6 +27,10 @@ class Sentence:
         self.properNouns = []
         self.verbs = []
         self.pronouns = []
+        self.adjectives = []
+        self.adverbs = []
+        self.wh_pronoun = []
+        self.wh_adverb = []
         self.stop = set(stopwords.words('english'))
         self.words = []
         self.stopWords = []
@@ -50,6 +54,16 @@ class Sentence:
             #is the word a verb?
             if word[1] == "VB" or word[1] == "VBN":
                 self.verbs.append(word[0])
+            #is the word an adjective?
+            if word[1] == "JJ":
+                self.adjectives.append(word[0])
+            #is the word an adverb?
+            if word[1] == "RB":
+                self.adverbs.append(word[0])
+            if word[1] == "WP":
+                self.wh_pronoun.append(word[0])
+            if word[1] == "WRB":
+                self.wh_adverb.append(word[0])
             #i will add in more word types, so the AI will be able to better recognize the type of data is has received
 
     def breakIntoWords(self):
@@ -107,6 +121,14 @@ for sentence in sentences:
             wordType = "verb"
         elif word in sentence.pronouns:
             wordType = "pronoun"
+        elif word in sentence.adverbs:
+            wordType = "adverb"
+        elif word in sentence.adjectives:
+            wordType = "adjective"
+        elif word in sentence.wh_adverb:
+            wordType = "wh_adverb"
+        elif word in sentence.wh_pronoun:
+            wordType = "wh_pronoun"
         else:
             wordType = "unknown"
         #console output
