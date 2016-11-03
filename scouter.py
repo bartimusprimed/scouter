@@ -37,6 +37,7 @@ class Sentence:
         self.tokenSentence = word_tokenize(self.sentence)
         self.wordConno = defaultdict(list)
         self.sentenceType = "unknown"
+        self.firebase = firebase.FirebaseApplication(fireBaseUrl, None)
 
     #Identify the words in the sentence, assign them to the appropriate arrays
     def identify(self):
@@ -52,7 +53,7 @@ class Sentence:
             if word[1] == "PRP":
                 self.pronouns.append(word[0])
             #is the word a verb?
-            if word[1] == "VB" or word[1] == "VBN":
+            if word[1] == "VB" or word[1] == "VBN" or word[1] == "VBG":
                 self.verbs.append(word[0])
             #is the word an adjective?
             if word[1] == "JJ":
@@ -76,65 +77,119 @@ class Sentence:
     def parseSentenceType(self):
         #check for the type of sentence
         #does it end with a question mark? then remove the question mark to stop it from causing issues when writing to the remote database.
-        if sentence.sentence[-1:] == "?":
-            sentence.sentenceType = "question"
-            sentence.sentence = sentence.sentence[:-1]
+        if self.sentence[-1:] == "?":
+            self.sentenceType = "question"
+            self.sentence = self.sentence[:-1]
         #does the sentence end with a ".", then remove the punctuation so it doesnt cause issues when writing to the remote database.
-        elif sentence.sentence[-1:] == ".":
-            sentence.sentenceType = "statement"
-            sentence.sentence = sentence.sentence[:-1]
+        elif self.sentence[-1:] == ".":
+            self.sentenceType = "statement"
+            self.sentence = self.sentence[:-1]
         # does the sentence end with a "!", then remove the punctuation so it doesnt cause issues when writing to the remote database.
-        elif sentence.sentence[-1:] == "!":
-            sentence.sentenceType = "exclamation"
-            sentence.sentence = sentence.sentence[:-1]
+        elif self.sentence[-1:] == "!":
+            self.sentenceType = "exclamation"
+            self.sentence = self.sentence[:-1]
         #does the sentence contain the 5 "w" words that normally make something a question? Used in case someone didnt use proper punctuation.
-        elif sentence.sentence.partition(" ")[0] in questionKeywords:
-            sentence.sentenceType = "question"
+        elif self.sentence.partition(" ")[0] in questionKeywords:
+            self.sentenceType = "question"
         #the sentence does not meet any of the required checks, set it to unknown
         else:
-            sentence.sentenceType = "unknown"
+            self.sentenceType = "unknown"
 
 
-sentences = [Sentence("What is the time"), Sentence("Who are you?"), Sentence("i hate being outside."), Sentence("here is another sentence"), Sentence("Shut Up!")]
+    def submitSentence(self):
+        self.parseSentenceType()
+        # write the sentence to the remote database, so we can save it for later AI parsing
+        sentenceResult = self.firebase.put(url='/sentences',
+                                      data={'connotation': self.connotation, 'type': self.sentenceType},
+                                      name=self.sentence)
+        self.identify()
+        # console output
+        print("Nouns: %s" % self.properNouns)
+        print("Verbs: %s" % self.verbs)
+        print("Pronouns: %s" % self.pronouns)
+        print(self.connotation)
 
-#define the firebase database need to make this read from a file so all of github doesn't have access to write to the database
-firebase = firebase.FirebaseApplication(fireBaseUrl, None)
+        self.breakIntoWords()
 
-for sentence in sentences:
-    sentence.parseSentenceType()
-    #write the sentence to the remote database, so we can save it for later AI parsing
-    sentenceResult = firebase.put(url='/sentences', data={'connotation': sentence.connotation, 'type': sentence.sentenceType}, name=sentence.sentence)
-    sentence.identify()
-    #console output
-    print("Nouns: %s" % sentence.properNouns)
-    print("Verbs: %s" % sentence.verbs)
-    print("Pronouns: %s" % sentence.pronouns)
-    print(sentence.connotation)
+        # check if word is in any of the arrays, then post that to the remote database for later AI parsing
+        for word in self.wordConno:
+            if word in self.properNouns:
+                wordType = "noun"
+            elif word in self.verbs:
+                wordType = "verb"
+            elif word in self.pronouns:
+                wordType = "pronoun"
+            elif word in self.adverbs:
+                wordType = "adverb"
+            elif word in self.adjectives:
+                wordType = "adjective"
+            elif word in self.wh_adverb:
+                wordType = "wh_adverb"
+            elif word in self.wh_pronoun:
+                wordType = "wh_pronoun"
+            else:
+                wordType = "unknown"
+            # console output
+            print("-", word)
+            print("     neutral:  ", self.wordConno.get(word)[0].get('neu'))
+            print("     negative: ", self.wordConno.get(word)[0].get('neg'))
+            print("     positive: ", self.wordConno.get(word)[0].get('pos'))
+            # write the word, wordtype, and connotations to the remote database
+            wordResult = self.firebase.put(url='/words', name=word,
+                                      data={'type': wordType, 'neutral': self.wordConno.get(word)[0].get('neu'),
+                                            'negative': self.wordConno.get(word)[0].get('neg'),
+                                            'positive': self.wordConno.get(word)[0].get('pos')})
 
-    sentence.breakIntoWords()
 
-    #check if word is in any of the arrays, then post that to the remote database for later AI parsing
-    for word in sentence.wordConno:
-        if word in sentence.properNouns:
-            wordType = "noun"
-        elif word in sentence.verbs:
-            wordType = "verb"
-        elif word in sentence.pronouns:
-            wordType = "pronoun"
-        elif word in sentence.adverbs:
-            wordType = "adverb"
-        elif word in sentence.adjectives:
-            wordType = "adjective"
-        elif word in sentence.wh_adverb:
-            wordType = "wh_adverb"
-        elif word in sentence.wh_pronoun:
-            wordType = "wh_pronoun"
-        else:
-            wordType = "unknown"
-        #console output
-        print("-", word)
-        print("     neutral:  ", sentence.wordConno.get(word)[0].get('neu'))
-        print("     negative: ", sentence.wordConno.get(word)[0].get('neg'))
-        print("     positive: ", sentence.wordConno.get(word)[0].get('pos'))
-        #write the word, wordtype, and connotations to the remote database
-        wordResult = firebase.put(url='/words', name=word, data={'type': wordType, 'neutral': sentence.wordConno.get(word)[0].get('neu'), 'negative': sentence.wordConno.get(word)[0].get('neg'), 'positive': sentence.wordConno.get(word)[0].get('pos')})
+
+
+
+
+sentenceNew = Sentence("My name is Ayden, what is your name?")
+sentenceNew.submitSentence()
+
+# sentences = [Sentence("What is the time"), Sentence("Who are you?"), Sentence("i hate being outside."), Sentence("here is another sentence"), Sentence("Shut Up!")]
+#
+# #define the firebase database need to make this read from a file so all of github doesn't have access to write to the database
+# firebase = firebase.FirebaseApplication(fireBaseUrl, None)
+#
+# for sentence in sentences:
+#     sentence.parseSentenceType()
+#     #write the sentence to the remote database, so we can save it for later AI parsing
+#     sentenceResult = firebase.put(url='/sentences', data={'connotation': sentence.connotation, 'type': sentence.sentenceType}, name=sentence.sentence)
+#     sentence.identify()
+#     #console output
+#     print("Nouns: %s" % sentence.properNouns)
+#     print("Verbs: %s" % sentence.verbs)
+#     print("Pronouns: %s" % sentence.pronouns)
+#     print(sentence.connotation)
+#
+#     sentence.breakIntoWords()
+#
+#     #check if word is in any of the arrays, then post that to the remote database for later AI parsing
+#     for word in sentence.wordConno:
+#         if word in sentence.properNouns:
+#             wordType = "noun"
+#         elif word in sentence.verbs:
+#             wordType = "verb"
+#         elif word in sentence.pronouns:
+#             wordType = "pronoun"
+#         elif word in sentence.adverbs:
+#             wordType = "adverb"
+#         elif word in sentence.adjectives:
+#             wordType = "adjective"
+#         elif word in sentence.wh_adverb:
+#             wordType = "wh_adverb"
+#         elif word in sentence.wh_pronoun:
+#             wordType = "wh_pronoun"
+#         else:
+#             wordType = "unknown"
+#         #console output
+#         print("-", word)
+#         print("     neutral:  ", sentence.wordConno.get(word)[0].get('neu'))
+#         print("     negative: ", sentence.wordConno.get(word)[0].get('neg'))
+#         print("     positive: ", sentence.wordConno.get(word)[0].get('pos'))
+#         #write the word, wordtype, and connotations to the remote database
+#         wordResult = firebase.put(url='/words', name=word, data={'type': wordType, 'neutral': sentence.wordConno.get(word)[0].get('neu'),
+#                                                                  'negative': sentence.wordConno.get(word)[0].get('neg'),
+#                                                                  'positive': sentence.wordConno.get(word)[0].get('pos')})
