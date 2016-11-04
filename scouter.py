@@ -2,8 +2,12 @@ from firebase import firebase
 import nltk
 from nltk.sentiment.vader import SentimentIntensityAnalyzer
 from nltk.tokenize import word_tokenize
+from nltk.tokenize import sent_tokenize
+from nltk.tokenize import WordPunctTokenizer
 from nltk.corpus import stopwords
+from nltk.corpus import wordnet
 from collections import defaultdict
+from urllib import parse
 
 #Define Globals
 
@@ -11,6 +15,29 @@ fireBaseUrl = "https://project-6747688871085580068.firebaseio.com"
 sid = SentimentIntensityAnalyzer()
 punctuation = ["?","!",",",".",";"]
 questionKeywords = ["who", "what", "when", "why", "where", "whose", "whom", "which", "how"]
+
+
+
+class Paragraph:
+    def __init__(self, paragraph):
+        self.paragraph = paragraph
+        self.sentences = []
+
+    def breakIntoSentences(self):
+        sentenceToken = sent_tokenize(self.paragraph)
+
+        wpt = WordPunctTokenizer()
+        only_recognized_words = []
+
+        for sentence in sentenceToken:
+            tokens = wpt.tokenize(sentence)
+            if tokens:
+                for t in tokens:
+                    if wordnet.synsets(t):
+                        only_recognized_words.append(t)
+            sentence = " ".join(only_recognized_words)
+            self.sentences.append(Sentence(sentence))
+
 
 
 
@@ -101,7 +128,7 @@ class Sentence:
         # write the sentence to the remote database, so we can save it for later AI parsing
         sentenceResult = self.firebase.put(url='/sentences',
                                       data={'connotation': self.connotation, 'type': self.sentenceType},
-                                      name=self.sentence)
+                                      name=parse.quote_plus(self.sentence))
         self.identify()
         # console output
         print("Nouns: %s" % self.properNouns)
@@ -144,9 +171,6 @@ class Sentence:
 
 
 
-
-sentenceNew = Sentence("My name is Ayden, what is your name?")
-sentenceNew.submitSentence()
 
 # sentences = [Sentence("What is the time"), Sentence("Who are you?"), Sentence("i hate being outside."), Sentence("here is another sentence"), Sentence("Shut Up!")]
 #
