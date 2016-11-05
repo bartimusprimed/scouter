@@ -16,7 +16,9 @@ print(config)
 api = twitter.Api(access_token_key=config["access_key"], access_token_secret=config["access_secret"], consumer_key=config["consumer_key"], consumer_secret=config["consumer_secret"])
 
 
-query = api.GetSearch(term="donald trump", count=100, result_type="recent")
+
+comment out to not run
+query = api.GetSearch(term="hillary clinton", count=100, result_type="recent")
 for result in query:
     tweet = result.AsDict()["text"]
     tweet = ' '.join(re.sub("(@[A-Za-z0-9]+)|([^0-9A-Za-z \t])|(\w+:\/\/\S+)", " ", tweet).split())
