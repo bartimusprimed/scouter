@@ -15,4 +15,4 @@ def queryFirebase(query):
             total += result[r]['connotation']
     print(total)
 
-queryFirebase("trump")
+queryFirebase("skate")
